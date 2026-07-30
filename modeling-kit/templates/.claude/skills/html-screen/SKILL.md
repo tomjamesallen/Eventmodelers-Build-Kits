@@ -53,7 +53,8 @@ Guidelines:
 - Inline styles (`style="..."`) are the simplest way to keep each page self-contained.
 - No `<script>` tags, no inline event handlers (`onclick`, `onload`, ...), no `javascript:` URIs — these are stripped server-side from every page before persisting regardless of what's sent. This is a static visual mockup, not an interactive prototype.
 - A real page background (e.g. a light gray full-bleed background behind a centered white card) reads more realistically than a bare form floating on white.
-- Don't add `<html>`/`<head>`/`<body>` tags to a page — the caller wraps each page with its own stylesheet at render time.
+- Don't add `<html>`/`<head>`/`<body>` tags to a page — every page is a body-only fragment. The canvas wraps each page in its own `<html><head>` (stylesheet + resize script) `<body>...</body></html>` at render time, so anything sent is placed inside that generated `<body>`.
+- Bulma CSS (0.9.4) is loaded by default in that `<head>` — classes like `title`, `button`, `is-primary`, `field`/`control`/`input` etc. all work out of the box, no need to write custom CSS for standard form/layout components. Note headings need a size modifier too, e.g. `class="title is-1"` — a bare `title` class alone is always 2rem regardless of the tag (`h1` vs `h2` etc.).
 
 ## Step 4 — Render the pages
 
