@@ -20,6 +20,10 @@ const inlineHeader = cfg.boardId
 
 const claudeArgs = ['--dangerously-skip-permissions'];
 if (cfg.model) claudeArgs.push('--model', cfg.model);
+// `effort` is Claude Code's own --effort, validated in loadLocalConfig. Absent means
+// no flag, so the model's default effort stands and nothing changes for an install
+// that never sets it.
+if (cfg.effort) claudeArgs.push('--effort', cfg.effort);
 const claudeEnv = cfg.anthropicBaseUrl
   ? { ...process.env, ANTHROPIC_BASE_URL: cfg.anthropicBaseUrl }
   : process.env;

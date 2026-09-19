@@ -372,6 +372,7 @@ Both are stored alongside your credentials in the project root's `.eventmodelers
   "token": "...",
   "anthropicBaseUrl": "http://localhost:8000",
   "model": "claude-sonnet-5",
+  "effort": "high",
   "subagentModel": "sonnet"
 }
 ```
@@ -383,6 +384,23 @@ what's left is execution against a written brief, which doesn't need the expensi
 them to the same value to turn that split off. `subagentModel` reaches the agents as the `model`
 argument of the `Agent` tool, so it takes one of that tool's short aliases (`sonnet`, `opus`,
 `haiku`) — not a full model id like `model` does.
+
+`effort` is Claude Code's own `--effort`, passed through to every `claude` process the kit
+spawns — the build loop's per-task session, the bridge loop's, and `run --modeling`'s warm
+session alike. Where `model` picks who does the work, `effort` picks how long they chew on
+it, and the two are worth setting together rather than instead of each other: a build loop
+that implements a whole slice per turn wants a different answer from one answering a
+one-line board prompt. One of `low`, `medium`, `high`, `xhigh`, `max`; leave it out and no
+flag is passed at all, so the model's own default stands and nothing changes for an install
+that never sets it. It resolves through the same directory walk as everything else below, so
+setting it in a project's `.eventmodelers/config.json` scopes it to that codebase while
+`~/.eventmodelers/config.json` sets the default for every other one.
+
+An unknown level is rejected at startup rather than passed through: `claude` itself only
+warns about one and then runs at its default, which in an unattended loop means a typo costs
+hours of turns at an effort nobody chose. `npx @eventmodelers/cli config` prints the resolved
+value along with everything else, so you can check what a given directory will actually run
+with.
 
 Beyond the one-time install bootstrap, each stack's own `ralph.js`/`ralph-claude.js` governs how config is re-read at runtime — check `<kit-dir>/lib/` for the specifics of the stack you installed.
 
@@ -455,6 +473,7 @@ Every config field can be set via an `EVENTMODELERS_*` env var instead of the in
 | `EVENTMODELERS_BASE_URL` | `baseUrl` |
 | `EVENTMODELERS_ANTHROPIC_BASE_URL` | `anthropicBaseUrl` |
 | `EVENTMODELERS_MODEL` | `model` |
+| `EVENTMODELERS_EFFORT` | `effort` |
 | `EVENTMODELERS_SUBAGENT_MODEL` | `subagentModel` |
 | `EVENTMODELERS_AGENT_NAME` | `agentName` |
 

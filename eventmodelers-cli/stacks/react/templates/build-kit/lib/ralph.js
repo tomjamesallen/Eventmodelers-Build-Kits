@@ -51,11 +51,30 @@ async function retryOn401(label, fn, maxRetries = 3) {
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
+// Claude Code's own `--effort` levels, in ascending order. `effort` is read from the same
+// config walk as `model` and passed straight through to every `claude` this kit spawns —
+// `model` picks who does the work, `effort` picks how long they chew on it. Unset means no
+// flag at all, so an install that never sets it behaves exactly as before.
+const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+// `claude` does not reject an unknown `--effort`: it prints one warning line and runs at its
+// default. In a loop that line scrolls past, so a typo buys hours of turns at an effort
+// nobody chose and never says so again. Rejected here instead, once, at config-load time.
+function validateEffort(effort, source) {
+  if (effort === undefined || effort === null || effort === '') return undefined;
+  const level = String(effort).trim().toLowerCase();
+  if (!EFFORT_LEVELS.includes(level)) {
+    console.error(`[ralph] effort must be one of ${EFFORT_LEVELS.join(', ')} (got "${effort}") in ${source}.`);
+    process.exit(1);
+  }
+  return level;
+}
+
 // Config is resolved by walking from the kit dir up through every ancestor
 // directory's .eventmodelers/config.json, merging fields as we go — a value
 // set by a closer (more specific) directory always wins over a farther one.
 // The walk stops as soon as the merged config has full connection credentials
-// (see hasCredentials); anthropicBaseUrl/model are picked up opportunistically
+// (see hasCredentials); anthropicBaseUrl/model/effort are picked up opportunistically
 // along the way but never force the walk to continue further up.
 function* configCandidates(kitDir) {
   yield join(kitDir, '.eventmodelers', 'config.json');
@@ -95,6 +114,12 @@ function loadLocalConfig(kitDir) {
 
   if (process.env.BASE_URL) merged.baseUrl = process.env.BASE_URL;
   else if (!merged.baseUrl) merged.baseUrl = 'https://api.eventmodelers.ai';
+
+  // Checked once here rather than at each spawn site, so a bad level fails before the loop
+  // is up instead of on whichever turn happens to reach `claude` first.
+  if (merged.effort !== undefined) {
+    merged.effort = validateEffort(merged.effort, sources.join(', ') || 'config.json');
+  }
 
   if (sources.length > 1) {
     console.log(`[ralph] Merged config from: ${sources.join(', ')}`);

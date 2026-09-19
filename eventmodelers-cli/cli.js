@@ -316,6 +316,7 @@ const ENV_CONFIG_MAP = {
   EVENTMODELERS_BASE_URL: 'baseUrl',
   EVENTMODELERS_ANTHROPIC_BASE_URL: 'anthropicBaseUrl',
   EVENTMODELERS_MODEL: 'model',
+  EVENTMODELERS_EFFORT: 'effort',
   EVENTMODELERS_SUBAGENT_MODEL: 'subagentModel',
   EVENTMODELERS_AGENT_NAME: 'agentName',
 };
@@ -418,6 +419,29 @@ const DEFAULT_MAX_AGENTS = 5;
 // This reaches the agent as the `Agent` tool's own `model` argument, which takes a short alias
 // (`sonnet`/`opus`/`haiku`) rather than the full model id `model` above is set with.
 const DEFAULT_SUBAGENT_MODEL = 'sonnet';
+
+// How hard the agent session thinks per turn (`effort` in config.json, or
+// EVENTMODELERS_EFFORT) — Claude Code's own `--effort`, passed straight through to the
+// `claude` process every runner spawns. Unset means no flag at all, so the model's own
+// default stands and nothing changes for an install that never sets it. It pairs with
+// `model` rather than replacing it: `model` picks who does the work, `effort` picks how
+// long they chew on it, and a loop that builds a whole slice per turn wants a different
+// answer there than one answering a one-line board prompt.
+const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+// Same class of cost guard as `--max-agents` below, and it needs the guard more, not less:
+// `claude` does not reject an unknown `--effort`, it prints one warning line and runs at its
+// default. In a headless loop that line scrolls past, so a typo buys hours of turns at an
+// effort nobody chose and never says so again. Rejected outright instead.
+function resolveEffort(raw, source) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const effort = String(raw).trim().toLowerCase();
+  if (!EFFORT_LEVELS.includes(effort)) {
+    console.error(`❌ effort must be one of ${EFFORT_LEVELS.join(', ')} (got "${raw}"${source ? ` from ${source}` : ''}).`);
+    process.exit(1);
+  }
+  return effort;
+}
 
 // `--max-agents` is a cost guard, so a typo must not silently turn into "no limit" or
 // into the default: anything that isn't a positive integer is rejected outright.
@@ -1832,6 +1856,12 @@ async function runModeling(kitDir, projectDir, { verbose = false, standalone = f
 
   const claudeArgs = ['--dangerously-skip-permissions', '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose'];
   if (cfg.model) claudeArgs.push('--model', cfg.model);
+  // Validated here rather than in the kit's config walk because this cfg is merged from
+  // three places that walk never sees — the platform's /api/config, the per-board file, and
+  // this run's own flags/env — so the walk's check would miss exactly the values a single
+  // run is most likely to be given by hand.
+  const effort = resolveEffort(cfg.effort, 'config');
+  if (effort) claudeArgs.push('--effort', effort);
   const claudeEnv = {
     ...process.env,
     ...(cfg.anthropicBaseUrl ? { ANTHROPIC_BASE_URL: cfg.anthropicBaseUrl } : {}),
